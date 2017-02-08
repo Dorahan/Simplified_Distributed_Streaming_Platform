@@ -5,6 +5,15 @@ Client, server and platform communication.
 The current functionality only includes running a master server as platform. Where it will automatically get the host IP and available port number. When client runs the program they will need to enter the selected port number from the platform and it will create a socket connection. Then the client will select a name and pass any other data to platform.
 
 <br>
+
+Platform side:
+
+<img src="https://github.com/Dorahan/Simplified_Distributed_Streaming_Platform/blob/master/master.gif" width="500">
+
+Client side:
+
+<img src="https://github.com/Dorahan/Simplified_Distributed_Streaming_Platform/blob/master/client.gif" width="500">
+
 ****
 
 ### PROJECT SCOPE
