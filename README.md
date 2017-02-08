@@ -14,6 +14,7 @@ Client side:
 
 <img src="https://github.com/Dorahan/Simplified_Distributed_Streaming_Platform/blob/master/client.gif" width="500">
 
+<br>
 ****
 
 ### PROJECT SCOPE
