@@ -27,36 +27,77 @@ import socket
 import threading
 from queue import Queue
 from _thread import *
-import csv
+import json
+# import ipdb
 
-host = ''
+
+def setJson(dic, fn, msg):
+	print(msg)
+	with open(fn, 'w') as f:
+		json.dump(dic, f)
+		f.close()
+
+
+def getJson(fn, msg):
+	try:
+		## Reading data back
+		with open(fn, 'r') as f:
+		     data = json.load(f)
+		     f.close()
+		     return data
+	except:
+		setJson({}, fn, msg)
+		return {}
+
+
+host = socket.gethostbyname(socket.gethostname())
 port = 0
 addr = (host,port)
 bufsize = 4096
 
 serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 print("Socket created")
-print("This is a streaming platform")
+print('Type "server server_name" to start.')
+# print('Write a server name')
 
-print('Write a server name')
-server_name=input('$ ').replace('$ ','')
-print('Use "server {}" command to start'.format(server_name))
-if input('$ ') == 'server {}'.format(server_name):
+def get_input(param_count, error_message):
+    argument_list = input('$ ').replace('$ ', '').split()
+
+    while len(argument_list) != param_count:
+        print(error_message)
+        argument_list = input('$ ').replace('$ ', '').split()
+
+    return argument_list
+
+## Read/Write server information file
+def save_server():
+    server_info = getJson('server_info.json', 'Creating server_info.json')
+    name = server_name
+    server_info[name] = {
+        "ip": host,
+        "port": port
+    }
+    setJson(server_info, 'server_info.json', 'Saving server to server_info.json')
+
+
+server_input = get_input(2, 'Error: Type "server server_name" to start\n')
+
+
+server_name = server_input[1]
+if server_input[0] == 'server' and server_name:
     try:
         serv.bind(addr)
         host, port = serv.getsockname()
         print('{} at IP address {} and port number: {}'.format(server_name,host,port))
+        save_server()
         serv.listen(5)
         print('Waiting for a connection ...')
     except socket.error as e:
         print(str(e))
         sys.exit()
-else:
-    print('Unknown command.\nUse "server server_name" command to start\n')
+
 
 topic_dict = {}
-subcmd = ('create', 'publish', 'add', 'get')
-secondcmd = ('topic', 't1')
 
 class Topic:
     def init(self, topic_name, num_of_partitions):
@@ -64,7 +105,7 @@ class Topic:
         self.num_of_partitions = num_of_partitions
         self.num_of_subscribers = 0
         self.partition_mapping = {}
-        
+
         # init partitions
         self.partition_list = []
         for i in range(0, num_of_partitions):
@@ -122,7 +163,6 @@ class Topic:
         print('error, not subscribed to this partition')
 
 
-
 class Partition:
     def __init__(self):
         self.index = -1
@@ -155,69 +195,40 @@ class Client:
 
 class Master(object):
     def __init__(self):
-        def server(conn):
-            conn.send(str.encode("Welcome, type your username\n"))
-            username_info = conn.recv(bufsize)
-            username = username_info.decode("utf-8")
-            Master.user_file(username)
-            chev = "> "
-            conn.send(str.encode(username + chev))
 
+        def server(conn):
+            conn.send(str.encode('Welcome, type your username as "client client_name" to start'))
+            username = conn.recv(bufsize).decode()
+
+            ## All the web socket data communication happens below here
             while True:
-                data = conn.recv(bufsize)
+                raw_data = conn.recv(bufsize)
+                data = raw_data.decode()
+                split_data = data.split()
                 if not data:
                     break
-                # if data.decode() == 'create':
-                #     print('created test')
-                #     Master.create(self)
-                #     conn.send(str.encode('created test worked'))
-                if data.decode() in subcmd:
-                    print('valid subcommand')
-                if data.decode() == subcmd + secondcmd:
-                    print('yes')
-                print('{} wrote: {}'.format(username, data))
-                conn.send(str.encode(username + chev))
+                print('Client {} wrote: {}'.format(username, data))
+
+                if split_data[0] == 'add':
+                    servers = ' '.join(split_data[1:])
+                    servers = servers.split(') (')
+                    print(servers)
+                    self.add_servers(servers)
+                    self.distribute_server()
+
+                if split_data[0] == '_PASSED_DATA_':
+                    passed_data = data.replace('_PASSED_DATA_ ','')
+                    print('This is passed right now: '+passed_data)
 
             conn.close()
             print(username + ' ' + addr[0] + str(addr[1]) + ' closed connection')
 
+        ## Accept connection here and start threading
         while True:
             conn, addr = serv.accept()
             print("Connected with: " + addr[0] + str(addr[1]))
 
             start_new_thread(server, (conn,))
-
-    # Check if username exists
-    def user_file(username):
-        ''' Check if a file exists and is accessible. '''
-
-        try:
-            with open('info_user.csv') as f:
-                print('Running user_file.csv now ...')
-                pass
-        except IOError as e:
-            with open('info_user.csv','w') as f:
-                print('creating file')
-                print('Running user_file.csv now ...')
-                f.close()
-
-        if True:
-            with open('info_user.csv', 'r') as f:
-                reader = csv.reader(f, delimiter=',')
-                for name in reader:
-                    if name == username:
-                        print(username, 'named user exists')
-                        f.close()
-                        return True
-                    else:
-                        print('does not exist nope!')
-                        return False
-        else:
-            with open('info_user.csv', 'a') as f:
-                writer = csv.writer(f, delimiter=',')
-                writer.writerow(username)
-                print(username, 'added as new user')
-                f.close()
 
 
     def create(self):
@@ -242,6 +253,64 @@ class Master(object):
             topic_dict[args.topic].add_subsccriber(args.client)
         else:
             print('topic is not exist')
+
+    def add_servers(self, servers):
+
+        ## for easy copy pasting to test:
+        ## add (name=S1 ip=192.168.0.107 port=52630) (name=S2 ip=192.168.0.107 port=52633)
+        server_info = getJson('server_info.json','Getting server_info.json to add servers')
+
+        for server in servers:
+            server = server.replace('(', '').replace(')', '').split()
+            name = server[0].replace('name=', '')
+            ip = server[1].replace('ip=', '')
+            port = server[2].replace('port=', '')
+            print(name + ' - ' + ip + ' - ' + port)
+            # print(server_info)
+            server_info[name] = {
+            	"ip": ip,
+            	"port": port
+            }
+
+        setJson(server_info, 'server_info.json','Adding all servers')
+
+    def get_current_ip(self, server_info):
+    	connection_server_name = ''
+
+    	## Find current server name from current ip match
+    	for name in server_info:
+    		current_ip = socket.gethostbyname(socket.gethostname())
+
+    		if server_info[name]['ip'] == current_ip:
+    			connection_server_name = name
+    			break
+    	return connection_server_name
+
+    def distribute_server(self):
+        server_info = getJson('server_info.json','Getting server_info.json to distribute')
+        # connection_server_name = self.get_current_ip(server_info)
+        servers = list(server_info)
+
+        if server_name in servers:
+            servers.remove(server_name)
+        # if connection_server_name != server_info[name]:
+        print('These are the servers: '+str(servers))
+        for server in servers:
+            print('This is server: '+str(server))
+            host = server_info[server]['ip']
+            port = int(server_info[server]['port'])
+            addr = (host,port)
+            try:
+                distribution = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                distribution.bind(addr)
+                print('Sending server_info.json to {} at IP address {} and port number: {}'.format(server,host,port))
+                passed_data = server_info
+                print(passed_data)
+                distribution.send(encode('_PASSED_DATA_ '+passed_data))
+                distribution.close()
+            except socket.error as e:
+                print(str(e))
+
 
 
 if __name__ == '__main__':
