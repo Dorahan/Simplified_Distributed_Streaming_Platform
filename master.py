@@ -198,7 +198,7 @@ class Master(object):
 
         def server(conn):
             conn.send(str.encode('Welcome, type your username as "client client_name" to start'))
-            username = conn.recv(bufsize).decode()
+            # username = conn.recv(bufsize).decode()
 
             ## All the web socket data communication happens below here
             while True:
@@ -208,6 +208,8 @@ class Master(object):
                 if not data:
                     break
                 print('Client {} wrote: {}'.format(username, data))
+                if split_data[0] == 'client':
+                    username = split_data[1]
 
                 if split_data[0] == 'add':
                     servers = ' '.join(split_data[1:])
@@ -264,7 +266,7 @@ class Master(object):
 
         ## for easy copy pasting to test:
         ## add (name=S1 ip=192.168.0.108 port=50046) (name=S2 ip=192.168.0.107 port=55883)
-        ## add (name=S1 ip=192.168.0.108 port=50260) (name=S2 ip=192.168.0.101 port=59386)
+        ## add (name=S1 ip=192.168.0.108 port=50272) (name=S2 ip=192.168.0.101 port=59641)
         server_info = getJson('server_info.json','Getting server_info.json to add servers')
 
         for server in servers:
@@ -344,9 +346,13 @@ class Master(object):
                 print(passed_data)
                 str_passed_data = json.dumps(passed_data, sort_keys=True)
                 print(str_passed_data)
-                distributor.send(server+'server info pass')
                 distributor.send(('_PASSED_DATA_ '+str_passed_data).encode())
-                # distributor.close()
+                # distributor.send((server+' server info pass').encode())
+                # while True:
+                #     reply = input()
+                    # reply = ('_PASSED_DATA_ '+str_passed_data).encode()
+                    # distributor.send(reply.encode())
+                distributor.close()
             except socket.error as e:
                 print(str(e))
 
