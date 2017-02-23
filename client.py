@@ -82,6 +82,7 @@ connection_server_name = get_current_ip()
 host = server_info[connection_server_name]['ip']
 port = int(server_info[connection_server_name]['port'])
 addr = (host,port)
+# addr = ('192.168.0.108',50046)
 bufsize = 4096
 
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

@@ -217,8 +217,9 @@ class Master(object):
                     self.distribute_server()
 
                 if split_data[0] == '_PASSED_DATA_':
-                    passed_data = data.replace('_PASSED_DATA_ ','')
-                    print('This is passed right now: '+passed_data)
+                    str_passed_data = data.replace('_PASSED_DATA_ ','')
+                    passed_data = json.loads(str_passed_data)
+                    print('This is passed right now: \n'+passed_data)
 
             conn.close()
             print(username + ' ' + addr[0] + str(addr[1]) + ' closed connection')
@@ -257,7 +258,8 @@ class Master(object):
     def add_servers(self, servers):
 
         ## for easy copy pasting to test:
-        ## add (name=S1 ip=192.168.0.107 port=52630) (name=S2 ip=192.168.0.107 port=52633)
+        ## add (name=S1 ip=192.168.0.108 port=50046) (name=S2 ip=192.168.0.107 port=55883)
+        ## add (name=S1 ip=192.168.0.108 port=50230) (name=S2 ip=192.168.0.101 port=58352)
         server_info = getJson('server_info.json','Getting server_info.json to add servers')
 
         for server in servers:
@@ -301,12 +303,16 @@ class Master(object):
             port = int(server_info[server]['port'])
             addr = (host,port)
             try:
+                print('trying to create socket')
                 distribution = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                distribution.bind(addr)
+                print('trying to bind to addr')
+                print(addr)
+                distribution.connect(addr)
                 print('Sending server_info.json to {} at IP address {} and port number: {}'.format(server,host,port))
                 passed_data = server_info
                 print(passed_data)
-                distribution.send(encode('_PASSED_DATA_ '+passed_data))
+                str_passed_data = json.dumps(passed_data, sort_keys=True)
+                distribution.send(('_PASSED_DATA_ '+str_passed_data).encode())
                 distribution.close()
             except socket.error as e:
                 print(str(e))
