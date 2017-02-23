@@ -28,7 +28,6 @@ import threading
 from queue import Queue
 from _thread import *
 import json
-import time
 # import ipdb
 
 
@@ -265,7 +264,7 @@ class Master(object):
 
         ## for easy copy pasting to test:
         ## add (name=S1 ip=192.168.0.108 port=50046) (name=S2 ip=192.168.0.107 port=55883)
-        ## add (name=S1 ip=192.168.0.108 port=50248) (name=S2 ip=192.168.0.101 port=59118)
+        ## add (name=S1 ip=192.168.0.108 port=50260) (name=S2 ip=192.168.0.101 port=59386)
         server_info = getJson('server_info.json','Getting server_info.json to add servers')
 
         for server in servers:
@@ -294,6 +293,30 @@ class Master(object):
     			break
     	return connection_server_name
 
+    ## This is a test to thread the distributor
+    ## Right now does not work correctly
+    ## ----------------------------------------------
+    # def send_servers(server):
+    #     print('This is server: '+str(server))
+    #     host = server_info[server]['ip']
+    #     port = int(server_info[server]['port'])
+    #     addr = (host,port)
+    #     try:
+    #         print('trying to create socket')
+    #         distributor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    #         print('trying to connect to addr')
+    #         print(addr)
+    #         distributor.connect(addr)
+    #         print('Sending server_info.json to {} at IP address {} and port number: {}'.format(server,host,port))
+    #         passed_data = server_info
+    #         print(passed_data)
+    #         str_passed_data = json.dumps(passed_data, sort_keys=True)
+    #         print(str_passed_data)
+    #         distributor.send(('_PASSED_DATA_ '+str_passed_data).encode())
+    #         # distributor.close()
+    #     except socket.error as e:
+    #         print(str(e))
+
     def distribute_server(self):
         did_pass = False
         server_info = getJson('server_info.json','Getting server_info.json to distribute')
@@ -305,26 +328,25 @@ class Master(object):
         # if connection_server_name != server_info[name]:
         print('These are the servers: '+str(servers))
         for server in servers:
+            # start_new_thread(self.send_servers(servers))
             print('This is server: '+str(server))
             host = server_info[server]['ip']
             port = int(server_info[server]['port'])
             addr = (host,port)
             try:
                 print('trying to create socket')
-                distribution = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                distributor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 print('trying to connect to addr')
                 print(addr)
-                distribution.connect(addr)
+                distributor.connect(addr)
                 print('Sending server_info.json to {} at IP address {} and port number: {}'.format(server,host,port))
                 passed_data = server_info
                 print(passed_data)
                 str_passed_data = json.dumps(passed_data, sort_keys=True)
                 print(str_passed_data)
-                distribution.send(('_PASSED_DATA_ '+str_passed_data).encode())
-                while True:
-                    if did_pass:
-                        break
-                # distribution.close()
+                distributor.send(server+'server info pass')
+                distributor.send(('_PASSED_DATA_ '+str_passed_data).encode())
+                # distributor.close()
             except socket.error as e:
                 print(str(e))
 
