@@ -225,7 +225,8 @@ class Master(object):
                     print(str_passed_data)
                     print('yay 1')
                     passed_data = json.loads(str_passed_data)
-                    print('This is passed right now: '+passed_data)
+                    setJson(passed_data, 'server_info.json', 'Saving distributed server_info.json')
+                    # print('This is passed right now: '+passed_data)
                     print('yay 2')
                     # did_pass = True
 
@@ -269,7 +270,7 @@ class Master(object):
 
         ## for easy copy pasting to test:
         ## add (name=S1 ip=192.168.0.108 port=50046) (name=S2 ip=192.168.0.107 port=55883)
-        ## add (name=S1 ip=192.168.0.108 port=50272) (name=S2 ip=192.168.0.101 port=59641)
+        ## add (name=S1 ip=192.168.0.108 port=50280) (name=S2 ip=192.168.0.101 port=59736)
         server_info = getJson('server_info.json','Getting server_info.json to add servers')
 
         for server in servers:
