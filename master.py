@@ -202,6 +202,7 @@ class Master(object):
 
             ## All the web socket data communication happens below here
             while True:
+                username = ''
                 raw_data = conn.recv(bufsize)
                 data = raw_data.decode()
                 split_data = data.split()
