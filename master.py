@@ -219,9 +219,12 @@ class Master(object):
 
                 if split_data[0] == '_PASSED_DATA_':
                     str_passed_data = data.replace('_PASSED_DATA_ ','')
-                    passed_data = json.load(str_passed_data)
-                    print('This is passed right now: \n'+passed_data)
-                    print('yay')
+                    print(split_data[1])
+                    print(str_passed_data)
+                    print('yay 1')
+                    passed_data = json.loads(str_passed_data)
+                    # print('This is passed right now: '+passed_data)
+                    print('yay 2')
                     # did_pass = True
 
             conn.close()
@@ -262,7 +265,7 @@ class Master(object):
 
         ## for easy copy pasting to test:
         ## add (name=S1 ip=192.168.0.108 port=50046) (name=S2 ip=192.168.0.107 port=55883)
-        ## add (name=S1 ip=192.168.0.108 port=50246) (name=S2 ip=192.168.0.101 port=59073)
+        ## add (name=S1 ip=192.168.0.108 port=50248) (name=S2 ip=192.168.0.101 port=59118)
         server_info = getJson('server_info.json','Getting server_info.json to add servers')
 
         for server in servers:
@@ -309,14 +312,18 @@ class Master(object):
             try:
                 print('trying to create socket')
                 distribution = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                print('trying to bind to addr')
+                print('trying to connect to addr')
                 print(addr)
                 distribution.connect(addr)
                 print('Sending server_info.json to {} at IP address {} and port number: {}'.format(server,host,port))
                 passed_data = server_info
                 print(passed_data)
                 str_passed_data = json.dumps(passed_data, sort_keys=True)
+                print(str_passed_data)
                 distribution.send(('_PASSED_DATA_ '+str_passed_data).encode())
+                while True:
+                    if did_pass:
+                        break
                 # distribution.close()
             except socket.error as e:
                 print(str(e))
