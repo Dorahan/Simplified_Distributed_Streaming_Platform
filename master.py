@@ -28,6 +28,7 @@ import threading
 from queue import Queue
 from _thread import *
 import json
+import time
 # import ipdb
 
 
@@ -218,8 +219,10 @@ class Master(object):
 
                 if split_data[0] == '_PASSED_DATA_':
                     str_passed_data = data.replace('_PASSED_DATA_ ','')
-                    passed_data = json.loads(str_passed_data)
+                    passed_data = json.load(str_passed_data)
                     print('This is passed right now: \n'+passed_data)
+                    print('yay')
+                    # did_pass = True
 
             conn.close()
             print(username + ' ' + addr[0] + str(addr[1]) + ' closed connection')
@@ -259,7 +262,7 @@ class Master(object):
 
         ## for easy copy pasting to test:
         ## add (name=S1 ip=192.168.0.108 port=50046) (name=S2 ip=192.168.0.107 port=55883)
-        ## add (name=S1 ip=192.168.0.108 port=50230) (name=S2 ip=192.168.0.101 port=58352)
+        ## add (name=S1 ip=192.168.0.108 port=50246) (name=S2 ip=192.168.0.101 port=59073)
         server_info = getJson('server_info.json','Getting server_info.json to add servers')
 
         for server in servers:
@@ -289,6 +292,7 @@ class Master(object):
     	return connection_server_name
 
     def distribute_server(self):
+        did_pass = False
         server_info = getJson('server_info.json','Getting server_info.json to distribute')
         # connection_server_name = self.get_current_ip(server_info)
         servers = list(server_info)
@@ -313,7 +317,7 @@ class Master(object):
                 print(passed_data)
                 str_passed_data = json.dumps(passed_data, sort_keys=True)
                 distribution.send(('_PASSED_DATA_ '+str_passed_data).encode())
-                distribution.close()
+                # distribution.close()
             except socket.error as e:
                 print(str(e))
 
