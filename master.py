@@ -207,7 +207,7 @@ class Master(object):
                 split_data = data.split()
                 if not data:
                     break
-                print('Client {} wrote: {}'.format(username, data))
+
                 if split_data[0] == 'client':
                     username = split_data[1]
 
@@ -224,9 +224,11 @@ class Master(object):
                     print(str_passed_data)
                     print('yay 1')
                     passed_data = json.loads(str_passed_data)
-                    # print('This is passed right now: '+passed_data)
+                    print('This is passed right now: '+passed_data)
                     print('yay 2')
                     # did_pass = True
+
+                print('Client {} wrote: {}'.format(username, data))
 
             conn.close()
             print(username + ' ' + addr[0] + str(addr[1]) + ' closed connection')
