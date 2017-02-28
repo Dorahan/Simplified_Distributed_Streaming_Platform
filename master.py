@@ -50,7 +50,12 @@ def getJson(fn, msg):
 		return {}
 
 
-host = socket.gethostbyname(socket.gethostname())
+try:
+    host = socket.gethostbyname(socket.gethostname())
+except:
+    host = '23.253.20.67'
+# host = socket.gethostbyname(hostname)
+print(host)
 port = 0
 addr = (host,port)
 bufsize = 4096
@@ -99,6 +104,11 @@ if server_input[0] == 'server' and server_name:
 
 topic_dict = {}
 
+# for topic in topics:
+#     t = Topic()
+#     t.loadFromJson(topic)
+#     topic_dict[t.topic_name] = t
+
 class Topic:
     def init(self, topic_name, num_of_partitions):
         self.topic_name = topic_name
@@ -118,49 +128,112 @@ class Topic:
     def add_subscriber(self, client_name):
         if (self.num_of_subscribers >= self.num_of_partitions):
             print('no partition available, please wait.')
-        if self.num_of_subscribers == 0:
-            self.partition_mapping[client_name] = self.partition_list
+            return
 
         if client_name in self.partition_mapping:
             print('client already exists')
+            return
 
-        last_one = None
-        # partition allocations
-        for pair in self.partition_mapping:
-            if pair.value.length == 1:
-                continue
-            else:
-                last_one = pair.value[-1]
-                del pair.value[-1]
-        # all of pair.value is a list, which means [last_one] instead of last_one
-        self.partition_mapping[client_name] = [last_one]
+        self.num_of_subscribers += 1
+
+        if self.num_of_subscribers == 1:
+            self.partition_mapping[client_name] = self.partition_list
+        else:
+            last_one = None
+            # partition allocations
+            for pair in self.partition_mapping:
+                if pair.value.length == 1:
+                    continue
+                else:
+                    last_one = pair.value[-1]
+                    del pair.value[-1]
+            # all of pair.value is a list, which means [last_one] instead of last_one
+            self.partition_mapping[client_name] = [last_one]
+
+        # Reseted
+        for i in range (0, len(self.partition_list)):
+            self.partition_list[i] = []
+
+        for i in range(0, self.num_of_partitions):
+            self.partition_list[i % self.num_of_subscribers].append(i)
+
+
+        stream = getJson('data.json','Getting/Setting data.json')
+
+        for topic in stream['Topics']:
+            if self.topic_name == topic['topic_name']:
+                topic['subscribers'].append(client_name)
+
+        setJson(stream, 'data.json','Adding subscribers to JSON')
+
+    def del_subscriber(self, client_name):
+        if client_name not in self.partition_mapping:
+            print('Error: Not a subscriber to this topic.')
+            return
+
+        if self.num_of_subscribers == 1:
+            print('No more subscribers in this topic')
+            # Reseted
+            for i in range (0, len(self.partition_list)):
+                self.partition_list[i] = []
+            return
+
+
+
 
     def publish(self, client_name, msg, partition_num=None):
         if client_name not in self.partition_mapping:
-            print('not a subscriber')
+            print('Error: Not a subscriber to this topic.')
+            return
+
+        stream = getJson('data.json','Getting/Setting data.json')
+        current_topic = None
+        for topic in stream['Topics']:
+            if self.topic_name == topic['topic_name']:
+                current_topic = topic
 
         if partition_num is None:
             for p in self.partition_mapping[client_name]:
                 p.add(msg)
+            for i in range(0, self.num_of_partitions):
+                current_topic['partitions'][i].append(msg)
+
         else:
             for p in self.partition_mapping[client_name]:
                 if p.index == partition_num:
                     p.add(msg)
-                    return
+            current_topic['partitions'][partition_num].append(msg)
 
-        print('error, not subscribed to this partition')
+        setJson(stream, 'data.json','Publishing topic to JSON')
+
+        # print('error, not subscribed to this partition')
 
 
     def get(self, client_name, partition_num):
+        # ipdb.set_trace()
         if client_name not in self.partition_mapping:
-            print('not a subscriber')
+            print('Error: Not a subscriber to this topic.')
 
         for p in self.partition_mapping[client_name]:
             if p.index == partition_num:
                 p.remove()
-                return 'the msg'
+                print(msg)
+                return msg
 
-        print('error, not subscribed to this partition')
+        # print('error, not subscribed to this partition')
+
+    def toJson(self):
+        returned_dict = {
+            'topic_name': self.topic_name,
+            'num_of_partitions': self.num_of_partitions,
+            'subscribers': [],
+            'partitions': []
+        }
+
+        for i in range(0, self.num_of_partitions):
+            returned_dict['partitions'].append([])
+
+        return returned_dict
 
 
 class Partition:
@@ -188,21 +261,23 @@ class Partition:
         return first_one
 
 
-class Client:
-    def __init__(self, client_name):
-        self.client_name = client_name
-
-
 class Master(object):
     def __init__(self):
+        # self.client_name = 'default_client'
 
         def server(conn):
+            # self.client_name = 'default_client'
+            ## Send the first message to client here:
             conn.send(str.encode('Welcome, type your username as "client client_name" to start'))
             # username = conn.recv(bufsize).decode()
 
+            ## ---------------------------------------------------------------------------------
+            ## MAIN ARGUMENTS
             ## All the web socket data communication happens below here
+            ## ---------------------------------------------------------------------------------
+
             while True:
-                username = ''
+                client_name = 'default_client'
                 raw_data = conn.recv(bufsize)
                 data = raw_data.decode()
                 split_data = data.split()
@@ -210,7 +285,8 @@ class Master(object):
                     break
 
                 if split_data[0] == 'client':
-                    username = split_data[1]
+                    self.client_name = split_data[1]
+                    conn.send(('').encode())
 
                 if split_data[0] == 'add':
                     servers = ' '.join(split_data[1:])
@@ -221,19 +297,43 @@ class Master(object):
 
                 if split_data[0] == '_PASSED_DATA_':
                     str_passed_data = data.replace('_PASSED_DATA_ ','')
-                    print(split_data[1])
                     print(str_passed_data)
-                    print('yay 1')
                     passed_data = json.loads(str_passed_data)
-                    setJson(passed_data, 'server_info.json', 'Saving distributed server_info.json')
-                    # print('This is passed right now: '+passed_data)
-                    print('yay 2')
-                    # did_pass = True
+                    setJson(passed_data, 'server_info.json', 'Saving the above distributed server_info.json')
 
-                print('Client {} wrote: {}'.format(username, data))
+                if split_data[0] == 'create':
+                    print('creating topic')
+                    topics = ' '.join(split_data[1:])
+                    topics = topics.split(') (')
+                    print(topics)
+                    self.create(topics)
+
+                if split_data[0] == 'subscribe':
+                    topics = ' '.join(split_data[1:])
+                    topics = topics.split(') (')
+                    self.subscribe(topics)
+
+                if split_data[0] == 'publish':
+                    topics = ' '.join(split_data[1:])
+                    topics = topics.split(') (')
+                    self.publish(topics)
+
+                if split_data[0] == 'get':
+                    topics = ' '.join(split_data[1:])
+                    topics = topics.split(') (')
+                    self.get(topics)
+
+                if split_data[0] == 'unsubscribe':
+                    topics = ' '.join(split_data[1:])
+                    topics = topics.split(') (')
+                    topic_name = self.unsubscribe(topics)
+                    feedback = ('unsubscribed {} and partition is moved to others').format(topic_name)
+                    # conn.send(feedback.encode())
+
+                print('Client {} wrote: {}'.format(self.client_name, data))
 
             conn.close()
-            print(username + ' ' + addr[0] + str(addr[1]) + ' closed connection')
+            print(self.client_name + ' ' + addr[0] + str(addr[1]) + ' closed connection')
 
         ## Accept connection here and start threading
         while True:
@@ -243,34 +343,90 @@ class Master(object):
             start_new_thread(server, (conn,))
 
 
-    def create(self):
-        # parser = argparse.ArgumentParser(description='create')
-        # parser.add_argument('--topic')
-        # parser.add_argument('--partition')
-        # args = parser.parse_args(sys.argv[2:])
+    def create(self, topics):
 
-        t = Topic(t1,3)
-        t.init(topic_name='t1', num_of_partitions='4')
-        topic_dict[Topic(self)] = t
-        print(t)
+        stream = getJson('data.json','Getting/Setting data.json')
 
-    def subscribe(self):
-        # create a topic
-        # t = Topic()
-        # t.init('t_1', 2)
-        # topic_dict['t_1'] = t
+        for topic in topics:
+            topic = topic.replace('(', '').replace(')', '').split()
+            topic_name = topic[0].replace('topic=', '')
+            num_of_partitions = int(topic[1].replace('partitions=', ''))
+            # print(topic_name + ' - ' + str(num_of_partitions))
+
+            # create a topic
+            t = Topic()
+            t.init(topic_name, num_of_partitions)
+            topic_dict[topic_name] = t
+
+            try:
+                stream['Topics'].append(t.toJson())
+            except:
+                stream['Topics'] = []
+                stream['Topics'].append(t.toJson())
+
+        setJson(stream, 'data.json','Saving topics to JSON')
 
 
-        if args.topic in topic_dict:
-            topic_dict[args.topic].add_subsccriber(args.client)
-        else:
-            print('topic is not exist')
+    def subscribe(self, topics):
+        for topic in topics:
+            topic = topic.replace('(', '').replace(')', '').split()
+            topic_name = topic[0].replace('topic=', '')
+
+            if topic_name in topic_dict:
+                topic_dict[topic_name].add_subscriber(self.client_name)
+            else:
+                print('Error: Topic "{}" does not exist').format(topic_name)
+
+    def publish(self, topics):
+        for topic in topics:
+            topic = topic.replace('(', '').replace(')', '').split()
+            topic_name = topic[0].replace('topic=', '')
+            partition_num = None
+            if len(topic) == 4:
+                partition_num = int(topic[1].replace('partition=', ''))
+                key = topic[2].replace('key=', '')
+                value = int(topic[3].replace('value=', ''))
+            else:
+                key = topic[1].replace('key=', '')
+                value = int(topic[2].replace('value=', ''))
+
+            if topic_name in topic_dict:
+                message = {}
+                message[key] = value;
+                topic_dict[topic_name].publish(self.client_name, message, partition_num)
+            else:
+                print('Error: Topic "{}" does not exist').format(topic_name)
+
+    def get(self, topics):
+        for topic in topics:
+            topic = topic.replace('(', '').replace(')', '').split()
+            topic_name = topic[0].replace('topic=', '')
+            partition_num = topic[1].replace('partition=', '')
+
+            topic_dict[topic_name].get(self.client_name, partition_num)
+
+    def unsubscribe(self, topics):
+        for topic in topics:
+            topic = topic.replace('(', '').replace(')', '').split()
+            topic_name = topic[0].replace('topic=', '')
+
+            if topic_name in topic_dict:
+                # topic_dict[topic_name].add_subscriber(self.client_name)
+                print('Unsubscribing')
+                return topic_name
+            else:
+                print('Error: Topic "{}" does not exist').format(topic_name)
+
+        return topic_name
 
     def add_servers(self, servers):
 
         ## for easy copy pasting to test:
         ## add (name=S1 ip=192.168.0.108 port=50046) (name=S2 ip=192.168.0.107 port=55883)
-        ## add (name=S1 ip=192.168.0.108 port=50280) (name=S2 ip=192.168.0.101 port=59736)
+        ## add (name=S1 ip=23.253.20.67 port=53498) (name=S2 ip=10.210.99.171 port=58013)
+        ## add (name=S2 ip=172.20.10.3 port=52185) (name=S1 ip=172.20.10.3 port=51942)
+        ## create (topic=extra_t partitions=2) (topic=something partitions=2)
+        ## publish (topic=extra_t key=abc value=3)
         server_info = getJson('server_info.json','Getting server_info.json to add servers')
 
         for server in servers:
@@ -287,44 +443,7 @@ class Master(object):
 
         setJson(server_info, 'server_info.json','Adding all servers')
 
-    def get_current_ip(self, server_info):
-    	connection_server_name = ''
-
-    	## Find current server name from current ip match
-    	for name in server_info:
-    		current_ip = socket.gethostbyname(socket.gethostname())
-
-    		if server_info[name]['ip'] == current_ip:
-    			connection_server_name = name
-    			break
-    	return connection_server_name
-
-    ## This is a test to thread the distributor
-    ## Right now does not work correctly
-    ## ----------------------------------------------
-    # def send_servers(server):
-    #     print('This is server: '+str(server))
-    #     host = server_info[server]['ip']
-    #     port = int(server_info[server]['port'])
-    #     addr = (host,port)
-    #     try:
-    #         print('trying to create socket')
-    #         distributor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    #         print('trying to connect to addr')
-    #         print(addr)
-    #         distributor.connect(addr)
-    #         print('Sending server_info.json to {} at IP address {} and port number: {}'.format(server,host,port))
-    #         passed_data = server_info
-    #         print(passed_data)
-    #         str_passed_data = json.dumps(passed_data, sort_keys=True)
-    #         print(str_passed_data)
-    #         distributor.send(('_PASSED_DATA_ '+str_passed_data).encode())
-    #         # distributor.close()
-    #     except socket.error as e:
-    #         print(str(e))
-
     def distribute_server(self):
-        did_pass = False
         server_info = getJson('server_info.json','Getting server_info.json to distribute')
         # connection_server_name = self.get_current_ip(server_info)
         servers = list(server_info)
@@ -351,11 +470,6 @@ class Master(object):
                 str_passed_data = json.dumps(passed_data, sort_keys=True)
                 print(str_passed_data)
                 distributor.send(('_PASSED_DATA_ '+str_passed_data).encode())
-                # distributor.send((server+' server info pass').encode())
-                # while True:
-                #     reply = input()
-                    # reply = ('_PASSED_DATA_ '+str_passed_data).encode()
-                    # distributor.send(reply.encode())
                 distributor.close()
             except socket.error as e:
                 print(str(e))

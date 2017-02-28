@@ -35,7 +35,10 @@ def get_current_ip():
 
 	## Find current server name from current ip match
 	for name in server_info:
-		current_ip = socket.gethostbyname(socket.gethostname())
+		try:
+			current_ip = socket.gethostbyname(socket.gethostname())
+		except:
+			current_ip = '23.253.20.67'
 
 		if server_info[name]['ip'] == current_ip:
 			connection_server_name = name
@@ -64,7 +67,7 @@ def start_client():
 		username_input = getInput(2, 'Error: Type your username as "client client_name" to start.')
 
 	username = username_input[1]
-	client.send(username.encode())
+	client.send(('client '+username).encode())
 	return username
 
 ## ---------------------------------------------------------------------------------
@@ -100,10 +103,7 @@ username = start_client()
 while True:
     reply = input(username + '> ').replace(username + '> ', '')
     client.send(reply.encode())
-    # data = client.recv(bufsize)
-    # print(data.decode())
-    # if not data:
-    #     break
+
     if reply == 'quit':
         break
 
